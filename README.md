@@ -36,24 +36,6 @@ Script is intended to be executed from a cron job, at a high frequency. it will 
 if the correct interval has not passed.
 
 ## Commands
-```
-$ ./snapdump.py     
-usage: snapdump.py [-h] {backup,restore,list,cleanup} ...
-
-snapdump : backup and restore zfs snapshots to/from a foreign file system
-
-positional arguments:
-  {backup,restore,list,cleanup}
-                        sub-command help
-    backup              Backup
-    restore             Restore
-    list                Restore
-    cleanup             Cleanup old snapshots and dump directories
-
-optional arguments:
-  -h, --help            show this help message and exit
-```
-
 ### backup
 backup will create full or incremental snapshots of each dataset mentioend in the config, and will also perform cleanup
 
@@ -63,7 +45,6 @@ if destination dataset name is not provided, a new dataset with the suffix _rest
 
 ### list
 Listing all current snapshots per dataset.
-
 ```
 $ ./snapdump.py list
 storage/datasets01:
@@ -73,6 +54,5 @@ storage/home:
         + storage/home@2018_12_10__19_20_04
 ```
 Each snapshot is prefixed with = or +, to indicate if it's a full or incremental snapshot.
-
 ### cleanup
 Initiate the cleanup, this is not normally needed because back is cleaning up automatically

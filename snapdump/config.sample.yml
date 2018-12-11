@@ -1,6 +1,6 @@
 server:
   hostname: zfs_server
-  # Recommended to use root user and restrict, see restricted_shell/README.md
+  # Recommended to use root user and restrict shell commands, see restricted_shell/README.md
   ssh_user: root
   # SSH identity file, optional (if not specified will use defaults from ~/.ssh/
   identity_file: /tmp_backup/.key/backup_id_rsa

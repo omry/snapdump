@@ -3,8 +3,6 @@
 This tool is primarily intended to be used to backup zfs servers to foreign file systems with the offsite backup use case in mind.
 It's intended to be ran from outside the ZFS box, and uses passwordless ssh login to perform zfs operations.
 
-See [restricted_shell/README.md](restricted_shell/README.md) for details about improving security.
-
 ## Installation
 ```
 $ pip install snapdump
@@ -26,6 +24,7 @@ optional arguments:
   --conf CONF, -c CONF  Config file name
 ```
 You will need to start by creating a config file, see [config.sample.yml](snapdump/config.sample.yml) for an example.
+in addition, you need password-less ssh root access to your server. See [restricted_shell/README.md](restricted_shell/README.md) for details about improving security.
 
 ## Features
 * Incremental snapshot dump and restore

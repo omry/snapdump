@@ -226,7 +226,7 @@ def get_stored_snapshots(dataset_dir):
             snap_name  = snapshot_dir.split("##")[1]
             snapshots.append((group_dir, snap_type, snap_name, f"{group_dir}/{snapshot_dir}"))
 
-    return sorted(snapshots, key=lambda x: parse_timestamp(x[0]))
+    return sorted(snapshots, key=lambda x: parse_timestamp(x[2]))
 
 
 def backup(conf, args):

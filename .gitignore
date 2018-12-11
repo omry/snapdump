@@ -1,3 +1,4 @@
 dist
 build
 snapdump.egg-info
+config.yml

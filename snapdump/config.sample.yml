@@ -1,0 +1,31 @@
+server:
+  hostname: zfs_server
+  # Recommended to use root user and restrict, see restricted_shell/README.md
+  ssh_user: root
+  # SSH identity file, optional (if not specified will use defaults from ~/.ssh/
+  identity_file: /tmp_backup/.key/backup_id_rsa
+
+backup:
+  # Directory to dump stapshots into
+  directory: /mnt/something_big
+
+  # names of datasets to dump
+  datasets:
+    - storage/home
+    - storage/vms
+  interval_days:
+    # Interval in days for creating a new full dump
+    full: 30
+    # Interval in days for creating a new incremental dump
+    incremental: 1
+
+  # Number of days to retain snapshots.
+  # This effects both zfs snapshots and zfs dumps in BACKUP_ROOT
+  retention_days: 90
+
+  # Dump split size, some distributed file systems (like gluster) can't support arbitrarily large files.
+  split_size: 200GB
+
+  # Number of seconds without write activity to consider a
+  # dump which is in progress to be dead.
+  dump_dead_seconds: 60

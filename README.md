@@ -5,6 +5,28 @@ It's intended to be ran from outside the ZFS box, and uses passwordless ssh logi
 
 See [restricted_shell/README.md](restricted_shell/README.md) for details about improving security.
 
+## Installation
+$ pip install snapdump
+'''
+$ snapdump  --help
+usage: snapdump [-h] [--conf CONF] {backup,restore,list,cleanup} ...
+
+snapdump : backup and restore zfs snapshots to/from a foreign file system
+
+positional arguments:
+  {backup,restore,list,cleanup}
+                        sub-command help
+    backup              Backup
+    restore             Restore
+    list                Restore
+    cleanup             Cleanup old snapshots and dump directories
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --conf CONF, -c CONF  Config file name
+'''
+You will need to start by creating a config file, see [config.sample.yml](snapdump/config.sample.yml) for an example.
+
 ## Features
 * Incremental snapshot dump and restore
 * Taking zfs snapshots automatically

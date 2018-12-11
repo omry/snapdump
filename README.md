@@ -24,6 +24,7 @@ optional arguments:
   --conf CONF, -c CONF  Config file name
 ```
 You will need to start by creating a config file, see [config.sample.yml](snapdump/config.sample.yml) for an example.
+
 in addition, you need password-less ssh root access to your server. See [restricted_shell/README.md](restricted_shell/README.md) for details about improving security.
 
 ## Features

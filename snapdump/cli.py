@@ -323,8 +323,7 @@ def cleanup_snapshots(conf, args):
         for dataset in conf.backup.datasets:
             cleanup_dataset_snapshots(conf, dataset)
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="snapdump : backup and restore zfs snapshots to/from a foreign file system"
     )
@@ -367,7 +366,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     conf = OmegaConf.from_filename(args.conf)
-    print(conf.pretty())
 
     if args.command == "backup":
         backup(conf, args)
@@ -379,3 +377,7 @@ if __name__ == "__main__":
         cleanup_snapshots(conf, args)
     else:
         parser.print_help()
+
+if __name__ == "__main__":
+   main()
+

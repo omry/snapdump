@@ -39,21 +39,35 @@ if the correct interval has not passed.
 ### backup
 backup will create full or incremental snapshots of each dataset mentioend in the config, and will also perform cleanup
 
-### restore
-Restore will take a snapshot name and optionally a destination dataset and restore it. it will work correctly for incremental snapshots as well.
-if destination dataset name is not provided, a new dataset with the suffix _restore will be created.
+```
+$ snapdump -c /path-to-config/config.yml backup
+Creating incremental snapshot dump for storage/home@2018_12_14__00_23_58 based on 2018_12_14__00_21_47
+Creating incremental snapshot dump for storage/datasets01@2018_12_14__00_23_58 based on 2018_12_14__00_21_47
+```
 
 ### list
 Listing all current snapshots per dataset.
 ```
-$ snapdump -c /path/to/config.yml list
-storage/datasets01:
-        = storage/datasets01@2018_12_10__19_15_31
+snapdump -c /path-to-config/config.yml list
 storage/home:
-        = storage/home@2018_12_09__19_20_34
-        + storage/home@2018_12_10__19_20_04
+	= storage/home@2018_12_10__19_20_34
+	+ storage/home@2018_12_14__00_21_47
+	+ storage/home@2018_12_14__00_23_58
+storage/datasets01:
+	= storage/datasets01@2018_12_11__04_47_33
+	+ storage/datasets01@2018_12_14__00_21_47
+	+ storage/datasets01@2018_12_14__00_23_58
 ```
-Each snapshot is prefixed with = or +, to indicate if it's a full or incremental snapshot.
+Each snapshot is prefixed with = or +, to indicate if it's a full (=) or incremental (+) snapshot.
+
+### restore
+Restore will take a snapshot name and optionally a destination dataset and restore it. it will work correctly for incremental snapshots as well.
+if destination dataset name is not provided, a new dataset with the suffix _restore will be created.
+
+```
+$ snapdump -c /path-to-config/config.yml restore -s storage/datasets01@2018_12_14__00_23_58 
+Restoring snapshot storage/datasets01@2018_12_14__00_23_58 to storage/datasets01_restore
+```
 
 ### cleanup
 Initiate the cleanup, this is not normally needed because backup is cleaning up automatically

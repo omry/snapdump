@@ -46,7 +46,7 @@ if destination dataset name is not provided, a new dataset with the suffix _rest
 ### list
 Listing all current snapshots per dataset.
 ```
-$ ./snapdump.py list
+$ snapdump -c /path/to/config.yml list
 storage/datasets01:
         = storage/datasets01@2018_12_10__19_15_31
 storage/home:
@@ -54,5 +54,6 @@ storage/home:
         + storage/home@2018_12_10__19_20_04
 ```
 Each snapshot is prefixed with = or +, to indicate if it's a full or incremental snapshot.
+
 ### cleanup
-Initiate the cleanup, this is not normally needed because back is cleaning up automatically
+Initiate the cleanup, this is not normally needed because backup is cleaning up automatically

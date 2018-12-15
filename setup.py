@@ -5,7 +5,7 @@ Snapdump setup
     rm -rf dist/ snapdump.egg-info/ build
     python3 setup.py sdist bdist_wheel
     # Upload:
-    python3 -m twine upload dist/*
+    twine upload dist/*
 """
 from setuptools import setup, find_packages
 
@@ -14,7 +14,7 @@ with open("README.md", "r") as fh:
     setup(
         name="snapdump",
 	scripts=['bin/snapdump'],
-        version="1.0.3",
+        version="1.0.4",
         author="Omry Yadan",
         author_email="omry@yadan.net",
         description="ZFS incremental snapshot dump and restore tool",

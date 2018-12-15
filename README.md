@@ -1,4 +1,4 @@
-[![PyPI version](https://badge.fury.io/py/omegaconf.svg)](https://badge.fury.io/py/snapdump)
+[![PyPI version](https://badge.fury.io/py/snapdump.svg)](https://badge.fury.io/py/snapdump)
 
 # Snapdump
 

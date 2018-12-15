@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 import glob
 from omegaconf import OmegaConf
+import pkg_resources
 
 VERBOSE = False
 TIME_FORMAT = "%Y_%m_%d__%H_%M_%S"
@@ -324,9 +325,11 @@ def cleanup_snapshots(conf, args):
             cleanup_dataset_snapshots(conf, dataset)
 
 def main():
+    version = pkg_resources.require("snapdump")[0].version
     parser = argparse.ArgumentParser(
         description="snapdump : backup and restore zfs snapshots to/from a foreign file system"
     )
+    parser.add_argument('-v', '--version', action='version', version=f"snapdump {version}")
     parser.add_argument(
         "--conf",
         "-c",

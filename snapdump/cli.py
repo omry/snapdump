@@ -89,10 +89,12 @@ def chain(p1, p2_command):
 def zfs_snapshot(conf, dataset, snapshot_name):
     ssh_cmd(conf, ["zfs", "snapshot", f"{dataset}@{snapshot_name}"])
 
+
 def delete_temporary_dump_dirs(backup_dir):
     for tempdir in glob.glob(f"{backup_dir}/*.{TEMPDIR_SUFFIX}"):
         print(f"Deleting dead temporary dump dir : {tempdir}")
         shutil.rmtree(tempdir)
+
 
 def is_dump_in_progress(conf, backup_dir):
     for tempdir in glob.glob(f"{backup_dir}/*.{TEMPDIR_SUFFIX}"):
@@ -103,6 +105,7 @@ def is_dump_in_progress(conf, backup_dir):
         if delta < conf.backup.dump_dead_seconds:
             return True
     return False
+
 
 def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_name=None):
     zfs_cmd = ["zfs", "send", f"{dataset}@{snapshot_name}"]
@@ -152,20 +155,20 @@ def get_lines(s):
 
 def zfs_get_dataset_snapshots(conf, dataset):
     ret = ssh_cmd(conf,
-        [
-            "zfs",
-            "list",
-            "-H",
-            "-t",
-            "snapshot",
-            "-o",
-            "name",
-            "-s",
-            "creation",
-            "-r",
-            dataset,
-        ]
-    )
+                  [
+                      "zfs",
+                      "list",
+                      "-H",
+                      "-t",
+                      "snapshot",
+                      "-o",
+                      "name",
+                      "-s",
+                      "creation",
+                      "-r",
+                      dataset,
+                  ]
+                  )
     return get_lines(ret)
 
 
@@ -179,7 +182,7 @@ def zfs_get_latest_snapshot(dataset):
 # returns sorted snapshot names in the directory
 def get_snapshot_names(backup_dir):
     files = os.listdir(backup_dir)
-    files = list(filter(lambda x: len(x.split("##")) == 2 and not x.endswith(TEMPDIR_SUFFIX) , files))
+    files = list(filter(lambda x: len(x.split("##")) == 2 and not x.endswith(TEMPDIR_SUFFIX), files))
     snap_names = [v.split("##")[1] for v in files]
     return sorted(snap_names, key=parse_timestamp)
 
@@ -224,7 +227,7 @@ def get_stored_snapshots(dataset_dir):
     for group_dir in os.listdir(dataset_dir):
         for snapshot_dir in os.listdir(f"{dataset_dir}/{group_dir}"):
             snap_type = snapshot_dir.split("##")[0]
-            snap_name  = snapshot_dir.split("##")[1]
+            snap_name = snapshot_dir.split("##")[1]
             snapshots.append((group_dir, snap_type, snap_name, f"{group_dir}/{snapshot_dir}"))
 
     return sorted(snapshots, key=lambda x: parse_timestamp(x[2]))
@@ -239,6 +242,7 @@ def backup(conf, args):
         for dataset in conf.backup.datasets:
             backup_dir = get_backup_directory(conf, dataset, now)
             snapshot(conf, backup_dir, dataset, now)
+
 
 def restore(conf, args):
     dataset, snapshot = args.snapshot.split("@")
@@ -258,11 +262,12 @@ def restore(conf, args):
         for idx, e in enumerate(lst):
             if predicate(e): return idx
         return -1
+
     # group_dir, snap_type, snap_name, dir
     first_index = index_of(snapshots, lambda x: x[0] == group_dir)
     last_index = index_of(snapshots, lambda x: x[2] == snapshot)
     assert first_index != -1 and last_index != -1
-    for group_dir, snap_type, snap_name, dir in snapshots[first_index:last_index+1]:
+    for group_dir, snap_type, snap_name, dir in snapshots[first_index:last_index + 1]:
         files = [f"{dataset_dir}/{dir}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{dir}"))]
         cat = Popen(["cat"] + files, stdout=PIPE)
         gunzip = chain(cat, ["gunzip", "-c"])
@@ -279,7 +284,7 @@ def list_dataset_snapshots(conf, dataset):
     dataset_dir = "%s/%s" % (conf.backup.directory, normalize_dataset_name(dataset))
     if os.path.exists(dataset_dir):
         for (group_dir, snap_type, snap_name, dir) in get_stored_snapshots(dataset_dir):
-            marker = "=" if snap_type == 'full' else '+' # = full, + = incremental
+            marker = "=" if snap_type == 'full' else '+'  # = full, + = incremental
             print(f"\t{marker} {dataset}@{snap_name}")
 
 
@@ -323,6 +328,7 @@ def cleanup_snapshots(conf, args):
         # list all dataset snapshots
         for dataset in conf.backup.datasets:
             cleanup_dataset_snapshots(conf, dataset)
+
 
 def main():
     version = pkg_resources.require("snapdump")[0].version
@@ -374,13 +380,13 @@ def main():
         backup(conf, args)
     elif args.command == "restore":
         restore(conf, args)
-    elif args.command== "list":
+    elif args.command == "list":
         list_snapshots(conf, args)
     elif args.command == "cleanup":
         cleanup_snapshots(conf, args)
     else:
         parser.print_help()
 
-if __name__ == "__main__":
-   main()
 
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/omegaconf.svg)](https://badge.fury.io/py/snapdump)
+
 # Snapdump
 
 This tool is primarily intended to be used to backup zfs servers to foreign file systems with the offsite backup use case in mind.

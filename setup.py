@@ -27,5 +27,8 @@ with open("README.md", "r") as fh:
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: MIT License",
         ],
-        install_requires=['omegaconf>=1.0.7']
+        install_requires=[
+            'omegaconf>=1.0.7',
+            'setuptools'
+        ]
     )

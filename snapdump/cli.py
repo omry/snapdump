@@ -181,13 +181,6 @@ def zfs_get_dataset_snapshots(conf, dataset):
     return get_lines(ret)
 
 
-def zfs_get_latest_snapshot(dataset):
-    snapshots = zfs_get_dataset_snapshots(dataset)
-    if len(snapshots) == 0:
-        return None
-    return snapshots[-1]
-
-
 # returns sorted snapshot names in the directory
 def get_snapshot_names(backup_dir):
     files = os.listdir(backup_dir)
@@ -205,7 +198,8 @@ def get_and_verify_latest_snapshot(conf, backup_dir, dataset):
     if latest not in zfs_snapshots:
         # If this happens something is wrong, not sure how to proceed.
         # Did someone  manually delete the snapshots from the zfs server?
-        # An easy way out would be to delete the whole directory and let the backup create a fresh full snapshot and take it from there.
+        # An easy way out would be to delete the whole directory and let the
+        # backup create a fresh full snapshot and take it from there.
         raise Exception(
             "{0}@{1} snapshot is not on the zfs server, cannot take incremental snapshot. aborting.".format(
                 dataset, latest
@@ -254,30 +248,30 @@ def backup(conf, args):
 
 
 def restore(conf, args):
-    dataset, snapshot = args.snapshot.split("@")
+    dataset, snapshot_name = args.snapshot.split("@")
     dest_dataset = args.dest_dataset
     if dest_dataset is None:
         dest_dataset = f"{dataset}_restore"
-    print(f"Restoring snapshot {dataset}@{snapshot} to {dest_dataset}")
+    print(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
     dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
     if not os.path.exists(dataset_dir):
         raise Exception(f"Directory does not exist {dataset_dir}")
     # finds group:
     snapshots = get_stored_snapshots(dataset_dir)
-    group_dir = [group_dir for group_dir, snap_type, snap_name, dir in snapshots if snap_name == snapshot][0]
-    snapshot_names = [x[2] for x in snapshots]
+    group_dir = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name][0]
 
     def index_of(lst, predicate):
         for idx, e in enumerate(lst):
-            if predicate(e): return idx
+            if predicate(e):
+                return idx
         return -1
 
     # group_dir, snap_type, snap_name, dir
     first_index = index_of(snapshots, lambda x: x[0] == group_dir)
-    last_index = index_of(snapshots, lambda x: x[2] == snapshot)
+    last_index = index_of(snapshots, lambda x: x[2] == snapshot_name)
     assert first_index != -1 and last_index != -1
-    for group_dir, snap_type, snap_name, dir in snapshots[first_index:last_index + 1]:
-        files = [f"{dataset_dir}/{dir}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{dir}"))]
+    for group_dir, snap_type, snap_name, directory in snapshots[first_index:last_index + 1]:
+        files = [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
         cat = Popen(["cat"] + files, stdout=PIPE)
         gunzip = chain(cat, ["gunzip", "-c"])
         ssh = chain(gunzip, get_ssh_cmd_arr(conf) + ["zfs", "recv", "-F", dest_dataset])
@@ -291,12 +285,11 @@ def restore(conf, args):
         ensure_clean_exit(cat)
 
 
-
 def list_dataset_snapshots(conf, dataset):
     print(f"{dataset}:")
     dataset_dir = "%s/%s" % (conf.backup.directory, normalize_dataset_name(dataset))
     if os.path.exists(dataset_dir):
-        for (group_dir, snap_type, snap_name, dir) in get_stored_snapshots(dataset_dir):
+        for (group_dir, snap_type, snap_name, directory) in get_stored_snapshots(dataset_dir):
             marker = "=" if snap_type == 'full' else '+'  # = full, + = incremental
             print(f"\t{marker} {dataset}@{snap_name}")
 
@@ -307,22 +300,22 @@ def cleanup_dataset_snapshots(conf, dataset):
     if not os.path.exists(dataset_dir):
         raise Exception(f"Directory does not exist {dataset_dir}")
     # Cleaning up old snapshot dump dirs
-    for dir in os.listdir(dataset_dir):
-        timestamp = int(parse_timestamp(dir))
+    for directory in os.listdir(dataset_dir):
+        timestamp = int(parse_timestamp(directory))
         delta_seconds = now - timestamp
         if conf.backup.retention_days <= delta_seconds / (60.0 * 60 * 24):
-            print(f"Deleting old snapshot dir {dataset_dir}/{dir}")
-            shutil.rmtree(f"{dataset_dir}/{dir}")
+            print(f"Deleting old snapshot dir {dataset_dir}/{directory}")
+            shutil.rmtree(f"{dataset_dir}/{directory}")
 
     # Cleaning up old zfs snapshots
-    for snapshot in [x.split("@")[1] for x in zfs_get_dataset_snapshots(conf, dataset)]:
-        timestamp = int(parse_timestamp(snapshot))
+    for snapshot_name in [x.split("@")[1] for x in zfs_get_dataset_snapshots(conf, dataset)]:
+        timestamp = int(parse_timestamp(snapshot_name))
         # manual snapshots will not have parseable timestamp, we should leave those alone
         if timestamp != 0:
             delta_seconds = now - timestamp
             if conf.backup.retention_days <= delta_seconds / (60.0 * 60 * 24):
-                print(f"Deleting old ZFS snapshot {dataset}@{snapshot} from server")
-                ssh_cmd(conf, ["zfs", "destroy", f"{dataset}@{snapshot}"])
+                print(f"Deleting old ZFS snapshot {dataset}@{snapshot_name} from server")
+                ssh_cmd(conf, ["zfs", "destroy", f"{dataset}@{snapshot_name}"])
 
 
 def list_snapshots(conf, args):

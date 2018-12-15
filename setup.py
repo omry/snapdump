@@ -13,7 +13,7 @@ with open("README.md", "r") as fh:
     LONG_DESC = fh.read()
     setup(
         name="snapdump",
-	scripts=['bin/snapdump'],
+        scripts=['bin/snapdump'],
         version="1.0.4",
         author="Omry Yadan",
         author_email="omry@yadan.net",
@@ -22,7 +22,7 @@ with open("README.md", "r") as fh:
         long_description_content_type="text/markdown",
         url="https://github.com/omry/snapdump",
         keywords='zfs snapshot dump restore backup off-site',
-	packages=find_packages(exclude=["config.yml"]),
+        packages=find_packages(exclude=["config.yml"]),
         classifiers=[
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: MIT License",

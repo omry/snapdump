@@ -107,6 +107,11 @@ def is_dump_in_progress(conf, backup_dir):
     return False
 
 
+def ensure_clean_exit(process):
+    if process.returncode != 0:
+        raise Exception(f"{' '.join(process.args)} exited with non zero exit code {process.returncode}")
+
+
 def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_name=None):
     zfs_cmd = ["zfs", "send", f"{dataset}@{snapshot_name}"]
     backup_type = "full"
@@ -132,18 +137,22 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
     temporary_dir = f"{parts_dir}.{TEMPDIR_SUFFIX}"
     os.makedirs(temporary_dir)
 
-    ssh_process = Popen(get_ssh_cmd_arr(conf) + zfs_cmd, stdout=PIPE)
-    gzip_process = chain(ssh_process, "gzip")
-    split_process = chain(
-        gzip_process,
+    ssh = Popen(get_ssh_cmd_arr(conf) + zfs_cmd, stdout=PIPE)
+    gzip = chain(ssh, "gzip")
+    split = chain(
+        gzip,
         ["split", "-b", conf.backup.split_size, "-a3", "-", f"{temporary_dir}/{SNAPSHOT_SUFFIX}"],
     )
 
-    ssh_process.stdout.close()
-    gzip_process.stdout.close()
-    split_process.communicate()
-    ssh_process.wait()
-    gzip_process.wait()
+    ssh.stdout.close()
+    gzip.stdout.close()
+    split.communicate()
+    ssh.wait()
+    gzip.wait()
+    ensure_clean_exit(ssh)
+    ensure_clean_exit(gzip)
+    ensure_clean_exit(split)
+
     cleanup_dataset_snapshots(conf, dataset)
 
     os.rename(temporary_dir, parts_dir)
@@ -277,6 +286,10 @@ def restore(conf, args):
         ssh.communicate()
         cat.wait()
         gunzip.wait()
+        ensure_clean_exit(ssh)
+        ensure_clean_exit(gunzip)
+        ensure_clean_exit(cat)
+
 
 
 def list_dataset_snapshots(conf, dataset):

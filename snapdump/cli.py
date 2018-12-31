@@ -9,6 +9,7 @@ from datetime import datetime
 import glob
 from omegaconf import OmegaConf
 import pkg_resources
+import re
 
 VERBOSE = False
 TIME_FORMAT = "%Y_%m_%d__%H_%M_%S"
@@ -208,7 +209,7 @@ def get_and_verify_latest_snapshot(conf, backup_dir, dataset):
     return latest
 
 
-def snapshot(conf, backup_dir, dataset, now):
+def snapshot(conf, backup_dir, dataset, now, verify):
     nowtime = datetime.utcfromtimestamp(now).strftime(TIME_FORMAT)
     newest_snapshot = get_and_verify_latest_snapshot(conf, backup_dir, dataset)
     zfs_snapshot(conf, dataset, nowtime)
@@ -221,6 +222,10 @@ def snapshot(conf, backup_dir, dataset, now):
             zfs_dump_snapshot(conf, backup_dir, dataset, nowtime, newest_snapshot)
         else:
             print(f"Latest dir new enough, skipping {dataset} snapshot")
+            return
+
+    if verify:
+        verify_impl(conf, dataset, nowtime)
 
 
 # returns a sorted list of tupples (group_dir, snapshot_type, snapshot_name, dir)
@@ -238,22 +243,16 @@ def get_stored_snapshots(dataset_dir):
 
 def backup(conf, args):
     now = int(time.time())  # UTC unixtime
+    verify = not args.no_verify
     if args.dataset:
         backup_dir = get_backup_directory(conf, args.dataset, now)
-        snapshot(conf, backup_dir, args.dataset, now)
+        snapshot(conf, backup_dir, args.dataset, now, verify)
     else:
         for dataset in conf.backup.datasets:
             backup_dir = get_backup_directory(conf, dataset, now)
-            snapshot(conf, backup_dir, dataset, now)
+            snapshot(conf, backup_dir, dataset, now, verify)
 
-
-def restore(conf, args):
-    dataset, snapshot_name = args.snapshot.split("@")
-    dest_dataset = args.dest_dataset
-    if dest_dataset is None:
-        dest_dataset = f"{dataset}_restore"
-    print(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
-    dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
+def get_snapshots_chain(dataset_dir, snapshot_name):
     if not os.path.exists(dataset_dir):
         raise Exception(f"Directory does not exist {dataset_dir}")
     # finds group:
@@ -266,11 +265,31 @@ def restore(conf, args):
                 return idx
         return -1
 
+
+    def index_of(lst, predicate):
+        for idx, e in enumerate(lst):
+            if predicate(e):
+                return idx
+        return -1
+
+    # finds group:
+    snapshots = get_stored_snapshots(dataset_dir)
+    group_dir = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name][0]
+
     # group_dir, snap_type, snap_name, dir
     first_index = index_of(snapshots, lambda x: x[0] == group_dir)
     last_index = index_of(snapshots, lambda x: x[2] == snapshot_name)
     assert first_index != -1 and last_index != -1
-    for group_dir, snap_type, snap_name, directory in snapshots[first_index:last_index + 1]:
+    return snapshots[first_index:last_index + 1]
+
+def restore(conf, args):
+    dataset, snapshot_name = args.snapshot.split("@")
+    dest_dataset = args.dest_dataset
+    if dest_dataset is None:
+        dest_dataset = f"{dataset}_restore"
+    print(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
+    dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
+    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(dataset_dir, snapshot_name):
         files = [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
         cat = Popen(["cat"] + files, stdout=PIPE)
         gunzip = chain(cat, ["gunzip", "-c"])
@@ -283,6 +302,51 @@ def restore(conf, args):
         ensure_clean_exit(ssh)
         ensure_clean_exit(gunzip)
         ensure_clean_exit(cat)
+
+def verify_impl(conf, dataset, snapshot_name):
+    print(f"Verifying snapshot {dataset}@{snapshot_name}")
+    dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
+
+    files = []
+    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(dataset_dir, snapshot_name):
+        files += [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
+    cat = Popen(["cat"] + files, stdout=PIPE)
+    gunzip = chain(cat, ["gunzip", "-c"])
+    ssh = chain(gunzip, get_ssh_cmd_arr(conf) + ["zstreamdump"])
+    cat.stdout.close()
+    gunzip.stdout.close()
+    out = ssh.communicate()
+    cat.wait()
+    gunzip.wait()
+    ensure_clean_exit(ssh)
+    ensure_clean_exit(gunzip)
+    ensure_clean_exit(cat)
+
+    from_guid = -1
+    to_guid = -1
+    prev_to_guid = -1
+    #toguid = 6314ecefe1c7f1d8
+    # fromguid = 0
+    reg = re.compile(r"(toguid|fromguid) = ([\w]+)")
+    for s in out[0].splitlines():
+        s = s.decode("utf-8").strip()
+        m = reg.match(s)
+        if m:
+            guid_type = m.group(1)
+            guid = m.group(2)
+            if guid_type == 'toguid':
+                prev_to_guid = to_guid
+                to_guid = guid
+            elif guid_type == 'fromguid':
+                from_guid = guid
+                if from_guid != '0' and from_guid != prev_to_guid:
+                    raise Exception(f"Mistmatch in guid chain : {from_guid} != {to_guid}")
+    print("ZFS stream intact")
+
+def verify(conf, args):
+    dataset, snapshot_name = args.snapshot.split("@")
+    verify_impl(conf, dataset, snapshot_name)
+
 
 
 def list_dataset_snapshots(conf, dataset):
@@ -363,6 +427,9 @@ def main():
     backup_parser.add_argument(
         "--dataset", "-d", help="Optional dataset to operate on", type=str
     )
+    backup_parser.add_argument(
+        "--no-verify", "-n", help="Do not verify created stream", type=bool, nargs='?', const=True, default=False
+    )
     restore_parser = subparsers.add_parser("restore", help="Restore")
     restore_parser.add_argument(
         "--snapshot",
@@ -378,7 +445,7 @@ def main():
         type=str,
         required=False,
     )
-    list_parser = subparsers.add_parser("list", help="Restore")
+    list_parser = subparsers.add_parser("list", help="List available snapshots to restore")
     list_parser.add_argument(
         "--dataset", "-d", help="Dataset to list snapshots for, default all", type=str
     )
@@ -388,6 +455,15 @@ def main():
     cleanup_parser.add_argument(
         "--dataset", "-d", help="Dataset to cleanup, default all", type=str
     )
+
+    verify_parser = subparsers.add_parser("verify", help="Verify the integrity of a snapshot chain")
+    verify_parser.add_argument(
+        "--snapshot",
+        "-s",
+        help="Snapshot to restore (for example storage/datasets01@2018_12_06__21_47_58)",
+        type=str,
+        required=True,
+    )
     args = parser.parse_args()
     conf = OmegaConf.from_filename(args.conf)
 
@@ -395,6 +471,8 @@ def main():
         backup(conf, args)
     elif args.command == "restore":
         restore(conf, args)
+    elif args.command == "verify":
+        verify(conf, args)
     elif args.command == "list":
         list_snapshots(conf, args)
     elif args.command == "cleanup":

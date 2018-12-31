@@ -10,7 +10,6 @@ datasets = [
     'storage/datasets01',
 ]
 
-
 def denied():
     print("Access denied")
     sys.exit(1)
@@ -28,18 +27,16 @@ re_list = re.compile(r'^zfs list( -\w( [\w/_-]+)?)*$')
 re_snap_ops = re.compile(r'^zfs (snapshot|destroy) ([\w/]+)@([\w]+)$')
 re_send = re.compile(r'^zfs send ([\w/]+)@([\w]+)( -i [\w]+)?$')
 re_recv = re.compile(r'^zfs recv -F ([\w/]+)$')
-
+zstreamdump = re.compile(r'^zstreamdump$')
 
 def unsupported_dataset_error(a_dataset):
     print(f"{a_dataset} is not in the list of managed datasets, fix in {__file__} in the server")
     sys.exit(1)
 
-
 def execute(a_cmd):
     subprocess.call(a_cmd, shell=True)
 
-
-if re_list.match(cmd):
+if zstreamdump.match(cmd) or re_list.match(cmd):
     execute(cmd)
 elif re_snap_ops.match(cmd):
     m = re_snap_ops.match(cmd)

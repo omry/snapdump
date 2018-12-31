@@ -289,9 +289,18 @@ def list_dataset_snapshots(conf, dataset):
     print(f"{dataset}:")
     dataset_dir = "%s/%s" % (conf.backup.directory, normalize_dataset_name(dataset))
     if os.path.exists(dataset_dir):
+        total = 0
         for (group_dir, snap_type, snap_name, directory) in get_stored_snapshots(dataset_dir):
+            dump_dir = f"{dataset_dir}/{directory}"
             marker = "=" if snap_type == 'full' else '+'  # = full, + = incremental
-            print(f"\t{marker} {dataset}@{snap_name}")
+            size_bytes = sum(os.path.getsize(f"{dump_dir}/{f}") for f in os.listdir(dump_dir) if os.path.isfile(f"{dump_dir}/{f}")) 
+            total += size_bytes
+            size_gb = size_bytes / (1024.0 * 1024 * 1024)
+            total_gb = total / (1024.0 * 1024 * 1024)
+            size_str = f"{total_gb:.2f}"
+            if snap_type == 'incr':
+                size_str += f" (+{size_gb:.2f})"
+            print(f"\t{marker} {dataset}@{snap_name}, {size_str} GB")
 
 
 def cleanup_dataset_snapshots(conf, dataset):

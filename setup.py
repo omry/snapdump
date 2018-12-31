@@ -14,7 +14,7 @@ with open("README.md", "r") as fh:
     setup(
         name="snapdump",
         scripts=['bin/snapdump'],
-        version="1.0.4",
+        version="1.0.5",
         author="Omry Yadan",
         author_email="omry@yadan.net",
         description="ZFS incremental snapshot dump and restore tool",

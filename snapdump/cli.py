@@ -11,12 +11,16 @@ from omegaconf import OmegaConf
 import pkg_resources
 import re
 
+CRON = False
 VERBOSE = False
 TIME_FORMAT = "%Y_%m_%d__%H_%M_%S"
 SNAPSHOT_SUFFIX = "snapshot-part-"
 TEMPDIR_SUFFIX = "dump-in-progress"
 
-
+def log(msg):
+    if not CRON:
+        print(msg)
+    
 def get_ssh_cmd_arr(conf):
     cmd = ["ssh", f"{conf.server.ssh_user}@{conf.server.hostname}"]
     if conf.server.identity_file is not None:
@@ -29,7 +33,7 @@ def get_ssh_cmd_arr(conf):
 def ssh_cmd(conf, command):
     cmd = get_ssh_cmd_arr(conf) + command
     if VERBOSE:
-        print('EXECUTING "{0}"'.format(" ".join(cmd)))
+        log('EXECUTING "{0}"'.format(" ".join(cmd)))
     return check_output(cmd)
 
 
@@ -43,7 +47,7 @@ def parse_timestamp(dirname):
         return d.timestamp()
     except ValueError as err:
         if VERBOSE:
-            print("Error parsing timestamp in {0} : {0}".format(dirname, err))
+            log(f"Error parsing timestamp in {dirname} : {err}")
         return 0
 
 
@@ -55,21 +59,21 @@ def get_backup_directory(conf, dataset, now):
     if newest_dir is None:
         os.makedirs(full_dir)
         if VERBOSE:
-            print("Directory does not exist, creating a new directory : %s" % full_dir)
+            log(f"Directory does not exist, creating a new directory : {full_dir}")
     else:
         ctime = parse_timestamp(newest_dir)
         delta_days = (now - ctime) / (60.0 * 60 * 24)
         if delta_days >= conf.backup.interval_days.full:
             os.makedirs(full_dir)
             if VERBOSE:
-                print(
+                log(
                     "Old directory older than %.2f days, creating a new one directory : %s"
                     % (conf.backup.interval_days.full, full_dir)
                 )
         else:
-            full_dir = "%s/%s" % (dataset_dir, newest_dir)
+            full_dir = f"{dataset_dir}/{newest_dir}"
             if VERBOSE:
-                print(
+                log(
                     "Reusing existing directory %s (%.1f/%.1f days)"
                     % (full_dir, delta_days, conf.backup.interval_days.full)
                 )
@@ -95,7 +99,7 @@ def zfs_snapshot(conf, dataset, snapshot_name):
 
 def delete_temporary_dump_dirs(backup_dir):
     for tempdir in glob.glob(f"{backup_dir}/*.{TEMPDIR_SUFFIX}"):
-        print(f"Deleting dead temporary dump dir : {tempdir}")
+        log(f"Deleting dead temporary dump dir : {tempdir}")
         shutil.rmtree(tempdir)
 
 
@@ -119,9 +123,9 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
     zfs_cmd = ["zfs", "send", f"{dataset}@{snapshot_name}"]
     backup_type = "full"
     if base_snapshot_name is None:
-        print("Creating full snapshot dump for {0}@{1}".format(dataset, snapshot_name))
+        log("Creating full snapshot dump for {0}@{1}".format(dataset, snapshot_name))
     else:
-        print(
+        log(
             "Creating incremental snapshot dump for {0}@{1} based on {2}".format(
                 dataset, snapshot_name, base_snapshot_name
             )
@@ -130,8 +134,8 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
         backup_type = "incr"
 
     if is_dump_in_progress(conf, backup_dir):
-        print(f"Dump is already in progress in {backup_dir}, bailing up")
-        return
+        log(f"Dump is already in progress in {backup_dir}, bailing up")
+        return False
 
     # delete dead dump directories
     delete_temporary_dump_dirs(backup_dir)
@@ -159,7 +163,7 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
     cleanup_dataset_snapshots(conf, dataset)
 
     os.rename(temporary_dir, parts_dir)
-
+    return True
 
 def get_lines(s):
     return list(filter(len, s.decode().split("\n")))
@@ -215,18 +219,19 @@ def snapshot(conf, backup_dir, dataset, now, verify):
     nowtime = datetime.utcfromtimestamp(now).strftime(TIME_FORMAT)
     newest_snapshot = get_and_verify_latest_snapshot(conf, backup_dir, dataset)
     zfs_snapshot(conf, dataset, nowtime)
+    created = False
     if newest_snapshot is None:
-        zfs_dump_snapshot(conf, backup_dir, dataset, nowtime)
+        created = zfs_dump_snapshot(conf, backup_dir, dataset, nowtime)
     else:
         ctime = parse_timestamp(newest_snapshot)
         delta_days = (now - ctime) / (60.0 * 60 * 24)
         if delta_days >= conf.backup.interval_days.incremental:
-            zfs_dump_snapshot(conf, backup_dir, dataset, nowtime, newest_snapshot)
+            created = zfs_dump_snapshot(conf, backup_dir, dataset, nowtime, newest_snapshot)
         else:
-            print(f"Latest dir new enough, skipping {dataset} snapshot")
+            log(f"Latest dir new enough, skipping {dataset} snapshot")
             return
 
-    if verify:
+    if verify and created:
         verify_impl(conf, dataset, nowtime)
 
 
@@ -259,7 +264,10 @@ def get_snapshots_chain(dataset_dir, snapshot_name):
         raise Exception(f"Directory does not exist {dataset_dir}")
     # finds group:
     snapshots = get_stored_snapshots(dataset_dir)
-    group_dir = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name][0]
+    groups = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name]
+    if len(groups) == 0:
+        raise Exception(f"snapshot '{snapshot_name}' does not exist")
+    group = groups[0]
 
     def index_of(lst, predicate):
         for idx, e in enumerate(lst):
@@ -289,7 +297,7 @@ def restore(conf, args):
     dest_dataset = args.dest_dataset
     if dest_dataset is None:
         dest_dataset = f"{dataset}_restore"
-    print(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
+    log(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
     dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
     for group_dir, snap_type, snap_name, directory in get_snapshots_chain(dataset_dir, snapshot_name):
         files = [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
@@ -306,7 +314,7 @@ def restore(conf, args):
         ensure_clean_exit(cat)
 
 def verify_impl(conf, dataset, snapshot_name):
-    print(f"Verifying snapshot {dataset}@{snapshot_name}")
+    log(f"Verifying snapshot {dataset}@{snapshot_name}")
     dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
 
     files = []
@@ -343,7 +351,7 @@ def verify_impl(conf, dataset, snapshot_name):
                 from_guid = guid
                 if from_guid != '0' and from_guid != prev_to_guid:
                     raise Exception(f"Mistmatch in guid chain : {from_guid} != {to_guid}")
-    print("ZFS stream intact")
+    log("ZFS stream intact")
 
 def verify(conf, args):
     dataset, snapshot_name = args.snapshot.split("@")
@@ -379,7 +387,7 @@ def cleanup_dataset_snapshots(conf, dataset):
         timestamp = int(parse_timestamp(directory))
         delta_seconds = now - timestamp
         if conf.backup.retention_days <= delta_seconds / (60.0 * 60 * 24):
-            print(f"Deleting old snapshot dir {dataset_dir}/{directory}")
+            log(f"Deleting old snapshot dir {dataset_dir}/{directory}")
             shutil.rmtree(f"{dataset_dir}/{directory}")
 
     # Cleaning up old zfs snapshots
@@ -389,7 +397,7 @@ def cleanup_dataset_snapshots(conf, dataset):
         if timestamp != 0:
             delta_seconds = now - timestamp
             if conf.backup.retention_days <= delta_seconds / (60.0 * 60 * 24):
-                print(f"Deleting old ZFS snapshot {dataset}@{snapshot_name} from server")
+                log(f"Deleting old ZFS snapshot {dataset}@{snapshot_name} from server")
                 ssh_cmd(conf, ["zfs", "destroy", f"{dataset}@{snapshot_name}"])
 
 
@@ -417,6 +425,7 @@ def main():
         description="snapdump : backup and restore zfs snapshots to/from a foreign file system"
     )
     parser.add_argument('-v', '--version', action='version', version=f"snapdump {version}")
+    parser.add_argument("--cron", '-q', help="Do not log anything except errors", action='store_true')
     parser.add_argument(
         "--conf",
         "-c",
@@ -468,7 +477,8 @@ def main():
     )
     args = parser.parse_args()
     conf = OmegaConf.from_filename(args.conf)
-
+    global CRON
+    CRON = args.cron
     if args.command == "backup":
         backup(conf, args)
     elif args.command == "restore":

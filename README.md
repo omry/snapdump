@@ -6,24 +6,11 @@ This tool is primarily intended to be used to backup zfs servers to foreign file
 It's intended to be ran from outside the ZFS box, and uses passwordless ssh login to perform zfs operations.
 
 ## Installation
+Simply pip install, after  which you will be able to use snapdump
 ```
 $ pip install snapdump
-$ snapdump  --help
-usage: snapdump [-h] [--conf CONF] {backup,restore,list,cleanup} ...
-
-snapdump : backup and restore zfs snapshots to/from a foreign file system
-
-positional arguments:
-  {backup,restore,list,cleanup}
-                        sub-command help
-    backup              Backup
-    restore             Restore
-    list                Restore
-    cleanup             Cleanup old snapshots and dump directories
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --conf CONF, -c CONF  Config file name
+$ snapdump -v
+snapdump 1.0.6
 ```
 You will need to start by creating a config file, see [config.sample.yml](snapdump/config.sample.yml) for an example.
 
@@ -40,7 +27,7 @@ if the correct interval has not passed.
 ## Commands
 ### backup
 backup will create full or incremental snapshots of each dataset mentioend in the config, and will also perform cleanup
-
+By default, backup will also verify the integrity of the dumped snapshot, this can be disabled by using --no-verify
 ```
 $ snapdump -c /path-to-config/config.yml backup
 Creating incremental snapshot dump for storage/home@2018_12_14__00_23_58 based on 2018_12_14__00_21_47

@@ -21,6 +21,8 @@ def get_ssh_cmd_arr(conf):
     cmd = ["ssh", f"{conf.server.ssh_user}@{conf.server.hostname}"]
     if conf.server.identity_file is not None:
         cmd += ["-i", f"{conf.server.identity_file}"]
+    if conf.server.ssh_options is not None:
+        cmd += conf.server.ssh_options.split(' ')
     return cmd
 
 

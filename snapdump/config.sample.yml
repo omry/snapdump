@@ -5,6 +5,10 @@ server:
   # SSH identity file, optional (if not specified will use defaults from ~/.ssh/
   identity_file: /tmp_backup/.key/backup_id_rsa
 
+  # ssh options to add to all ssh invocations.
+  # the list below will prevent ssh from fiddling with the known hosts file
+  ssh_options: '-q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
+
 backup:
   # Directory to dump stapshots into
   directory: /mnt/something_big

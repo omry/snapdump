@@ -17,16 +17,18 @@ TIME_FORMAT = "%Y_%m_%d__%H_%M_%S"
 SNAPSHOT_SUFFIX = "snapshot-part-"
 TEMPDIR_SUFFIX = "dump-in-progress"
 
+
 def log(msg):
     if not CRON:
         print(msg)
+
 
 def get_ssh_cmd_arr(conf):
     cmd = ["ssh", f"{conf.server.ssh_user}@{conf.server.hostname}"]
     if conf.server.identity_file is not None:
         cmd += ["-i", f"{conf.server.identity_file}"]
     if conf.server.ssh_options is not None:
-        cmd += conf.server.ssh_options.split(' ')
+        cmd += conf.server.ssh_options.split(" ")
     return cmd
 
 
@@ -116,10 +118,14 @@ def is_dump_in_progress(conf, backup_dir):
 
 def ensure_clean_exit(process):
     if process.returncode != 0:
-        raise Exception(f"{' '.join(process.args)} exited with non zero exit code {process.returncode}")
+        raise Exception(
+            f"{' '.join(process.args)} exited with non zero exit code {process.returncode}"
+        )
 
 
-def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_name=None):
+def zfs_dump_snapshot(
+    conf, backup_dir, dataset, snapshot_name, base_snapshot_name=None
+):
     zfs_cmd = ["zfs", "send", f"{dataset}@{snapshot_name}"]
     backup_type = "full"
     if base_snapshot_name is None:
@@ -148,7 +154,14 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
     gzip = chain(ssh, "gzip")
     split = chain(
         gzip,
-        ["split", "-b", conf.backup.split_size, "-a3", "-", f"{temporary_dir}/{SNAPSHOT_SUFFIX}"],
+        [
+            "split",
+            "-b",
+            conf.backup.split_size,
+            "-a3",
+            "-",
+            f"{temporary_dir}/{SNAPSHOT_SUFFIX}",
+        ],
     )
 
     ssh.stdout.close()
@@ -165,33 +178,39 @@ def zfs_dump_snapshot(conf, backup_dir, dataset, snapshot_name, base_snapshot_na
     os.rename(temporary_dir, parts_dir)
     return True
 
+
 def get_lines(s):
     return list(filter(len, s.decode().split("\n")))
 
 
 def zfs_get_dataset_snapshots(conf, dataset):
-    ret = ssh_cmd(conf,
-                  [
-                      "zfs",
-                      "list",
-                      "-H",
-                      "-t",
-                      "snapshot",
-                      "-o",
-                      "name",
-                      "-s",
-                      "creation",
-                      "-r",
-                      dataset,
-                  ]
-                  )
+    ret = ssh_cmd(
+        conf,
+        [
+            "zfs",
+            "list",
+            "-H",
+            "-t",
+            "snapshot",
+            "-o",
+            "name",
+            "-s",
+            "creation",
+            "-r",
+            dataset,
+        ],
+    )
     return get_lines(ret)
 
 
 # returns sorted snapshot names in the directory
 def get_snapshot_names(backup_dir):
     files = os.listdir(backup_dir)
-    files = list(filter(lambda x: len(x.split("##")) == 2 and not x.endswith(TEMPDIR_SUFFIX), files))
+    files = list(
+        filter(
+            lambda x: len(x.split("##")) == 2 and not x.endswith(TEMPDIR_SUFFIX), files
+        )
+    )
     snap_names = [v.split("##")[1] for v in files]
     return sorted(snap_names, key=parse_timestamp)
 
@@ -226,7 +245,9 @@ def snapshot(conf, backup_dir, dataset, now, verify):
         ctime = parse_timestamp(newest_snapshot)
         delta_days = (now - ctime) / (60.0 * 60 * 24)
         if delta_days >= conf.backup.interval_days.incremental:
-            created = zfs_dump_snapshot(conf, backup_dir, dataset, nowtime, newest_snapshot)
+            created = zfs_dump_snapshot(
+                conf, backup_dir, dataset, nowtime, newest_snapshot
+            )
         else:
             log(f"Latest dir new enough, skipping {dataset} snapshot")
             return
@@ -243,7 +264,9 @@ def get_stored_snapshots(dataset_dir):
         for snapshot_dir in os.listdir(f"{dataset_dir}/{group_dir}"):
             snap_type = snapshot_dir.split("##")[0]
             snap_name = snapshot_dir.split("##")[1]
-            snapshots.append((group_dir, snap_type, snap_name, f"{group_dir}/{snapshot_dir}"))
+            snapshots.append(
+                (group_dir, snap_type, snap_name, f"{group_dir}/{snapshot_dir}")
+            )
 
     return sorted(snapshots, key=lambda x: parse_timestamp(x[2]))
 
@@ -259,12 +282,17 @@ def backup(conf, args):
             backup_dir = get_backup_directory(conf, dataset, now)
             snapshot(conf, backup_dir, dataset, now, verify)
 
+
 def get_snapshots_chain(dataset_dir, snapshot_name):
     if not os.path.exists(dataset_dir):
         raise Exception(f"Directory does not exist {dataset_dir}")
     # finds group:
     snapshots = get_stored_snapshots(dataset_dir)
-    groups = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name]
+    groups = [
+        group_dir
+        for group_dir, snap_type, snap_name, directory in snapshots
+        if snap_name == snapshot_name
+    ]
     if len(groups) == 0:
         raise Exception(f"snapshot '{snapshot_name}' does not exist")
     group = groups[0]
@@ -275,7 +303,6 @@ def get_snapshots_chain(dataset_dir, snapshot_name):
                 return idx
         return -1
 
-
     def index_of(lst, predicate):
         for idx, e in enumerate(lst):
             if predicate(e):
@@ -284,13 +311,18 @@ def get_snapshots_chain(dataset_dir, snapshot_name):
 
     # finds group:
     snapshots = get_stored_snapshots(dataset_dir)
-    group_dir = [group_dir for group_dir, snap_type, snap_name, directory in snapshots if snap_name == snapshot_name][0]
+    group_dir = [
+        group_dir
+        for group_dir, snap_type, snap_name, directory in snapshots
+        if snap_name == snapshot_name
+    ][0]
 
     # group_dir, snap_type, snap_name, dir
     first_index = index_of(snapshots, lambda x: x[0] == group_dir)
     last_index = index_of(snapshots, lambda x: x[2] == snapshot_name)
     assert first_index != -1 and last_index != -1
-    return snapshots[first_index:last_index + 1]
+    return snapshots[first_index : last_index + 1]
+
 
 def restore(conf, args):
     dataset, snapshot_name = args.snapshot.split("@")
@@ -299,8 +331,13 @@ def restore(conf, args):
         dest_dataset = f"{dataset}_restore"
     log(f"Restoring snapshot {dataset}@{snapshot_name} to {dest_dataset}")
     dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
-    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(dataset_dir, snapshot_name):
-        files = [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
+    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(
+        dataset_dir, snapshot_name
+    ):
+        files = [
+            f"{dataset_dir}/{directory}/{file}"
+            for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))
+        ]
         cat = Popen(["cat"] + files, stdout=PIPE)
         gunzip = chain(cat, ["gunzip", "-c"])
         ssh = chain(gunzip, get_ssh_cmd_arr(conf) + ["zfs", "recv", "-F", dest_dataset])
@@ -313,13 +350,19 @@ def restore(conf, args):
         ensure_clean_exit(gunzip)
         ensure_clean_exit(cat)
 
+
 def verify_impl(conf, dataset, snapshot_name):
     log(f"Verifying snapshot {dataset}@{snapshot_name}")
     dataset_dir = f"{conf.backup.directory}/{normalize_dataset_name(dataset)}"
 
     files = []
-    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(dataset_dir, snapshot_name):
-        files += [f"{dataset_dir}/{directory}/{file}" for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))]
+    for group_dir, snap_type, snap_name, directory in get_snapshots_chain(
+        dataset_dir, snapshot_name
+    ):
+        files += [
+            f"{dataset_dir}/{directory}/{file}"
+            for file in sorted(os.listdir(f"{dataset_dir}/{directory}"))
+        ]
     cat = Popen(["cat"] + files, stdout=PIPE)
     gunzip = chain(cat, ["gunzip", "-c"])
     ssh = chain(gunzip, get_ssh_cmd_arr(conf) + ["zstreamdump"])
@@ -335,7 +378,7 @@ def verify_impl(conf, dataset, snapshot_name):
     from_guid = -1
     to_guid = -1
     prev_to_guid = -1
-    #toguid = 6314ecefe1c7f1d8
+    # toguid = 6314ecefe1c7f1d8
     # fromguid = 0
     reg = re.compile(r"(toguid|fromguid) = ([\w]+)")
     for s in out[0].splitlines():
@@ -344,19 +387,21 @@ def verify_impl(conf, dataset, snapshot_name):
         if m:
             guid_type = m.group(1)
             guid = m.group(2)
-            if guid_type == 'toguid':
+            if guid_type == "toguid":
                 prev_to_guid = to_guid
                 to_guid = guid
-            elif guid_type == 'fromguid':
+            elif guid_type == "fromguid":
                 from_guid = guid
-                if from_guid != '0' and from_guid != prev_to_guid:
-                    raise Exception(f"Mistmatch in guid chain : {from_guid} != {to_guid}")
+                if from_guid != "0" and from_guid != prev_to_guid:
+                    raise Exception(
+                        f"Mistmatch in guid chain : {from_guid} != {to_guid}"
+                    )
     log("ZFS stream intact")
+
 
 def verify(conf, args):
     dataset, snapshot_name = args.snapshot.split("@")
     verify_impl(conf, dataset, snapshot_name)
-
 
 
 def list_dataset_snapshots(conf, dataset):
@@ -364,15 +409,21 @@ def list_dataset_snapshots(conf, dataset):
     dataset_dir = "%s/%s" % (conf.backup.directory, normalize_dataset_name(dataset))
     if os.path.exists(dataset_dir):
         total = 0
-        for (group_dir, snap_type, snap_name, directory) in get_stored_snapshots(dataset_dir):
+        for (group_dir, snap_type, snap_name, directory) in get_stored_snapshots(
+            dataset_dir
+        ):
             dump_dir = f"{dataset_dir}/{directory}"
-            marker = "=" if snap_type == 'full' else '+'  # = full, + = incremental
-            size_bytes = sum(os.path.getsize(f"{dump_dir}/{f}") for f in os.listdir(dump_dir) if os.path.isfile(f"{dump_dir}/{f}"))
+            marker = "=" if snap_type == "full" else "+"  # = full, + = incremental
+            size_bytes = sum(
+                os.path.getsize(f"{dump_dir}/{f}")
+                for f in os.listdir(dump_dir)
+                if os.path.isfile(f"{dump_dir}/{f}")
+            )
             total += size_bytes
             size_gb = size_bytes / (1024.0 * 1024 * 1024)
             total_gb = total / (1024.0 * 1024 * 1024)
             size_str = f"{total_gb:.2f}"
-            if snap_type == 'incr':
+            if snap_type == "incr":
                 size_str += f" (+{size_gb:.2f})"
             print(f"\t{marker} {dataset}@{snap_name}, {size_str} GB")
 
@@ -391,7 +442,9 @@ def cleanup_dataset_snapshots(conf, dataset):
             shutil.rmtree(f"{dataset_dir}/{directory}")
 
     # Cleaning up old zfs snapshots
-    for snapshot_name in [x.split("@")[1] for x in zfs_get_dataset_snapshots(conf, dataset)]:
+    for snapshot_name in [
+        x.split("@")[1] for x in zfs_get_dataset_snapshots(conf, dataset)
+    ]:
         timestamp = int(parse_timestamp(snapshot_name))
         # manual snapshots will not have parseable timestamp, we should leave those alone
         if timestamp != 0:
@@ -424,14 +477,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="snapdump : backup and restore zfs snapshots to/from a foreign file system"
     )
-    parser.add_argument('-v', '--version', action='version', version=f"snapdump {version}")
-    parser.add_argument("--cron", '-q', help="Do not log anything except errors", action='store_true')
     parser.add_argument(
-        "--conf",
-        "-c",
-        help="Config file name",
-        type=str,
-        default='config.yml',
+        "-v", "--version", action="version", version=f"snapdump {version}"
+    )
+    parser.add_argument(
+        "--cron", "-q", help="Do not log anything except errors", action="store_true"
+    )
+    parser.add_argument(
+        "--conf", "-c", help="Config file name", type=str, default="config.yml"
     )
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
     backup_parser = subparsers.add_parser("backup", help="Backup")
@@ -439,7 +492,13 @@ def main():
         "--dataset", "-d", help="Optional dataset to operate on", type=str
     )
     backup_parser.add_argument(
-        "--no-verify", "-n", help="Do not verify created stream", type=bool, nargs='?', const=True, default=False
+        "--no-verify",
+        "-n",
+        help="Do not verify created stream",
+        type=bool,
+        nargs="?",
+        const=True,
+        default=False,
     )
     restore_parser = subparsers.add_parser("restore", help="Restore")
     restore_parser.add_argument(
@@ -456,7 +515,9 @@ def main():
         type=str,
         required=False,
     )
-    list_parser = subparsers.add_parser("list", help="List available snapshots to restore")
+    list_parser = subparsers.add_parser(
+        "list", help="List available snapshots to restore"
+    )
     list_parser.add_argument(
         "--dataset", "-d", help="Dataset to list snapshots for, default all", type=str
     )
@@ -467,7 +528,9 @@ def main():
         "--dataset", "-d", help="Dataset to cleanup, default all", type=str
     )
 
-    verify_parser = subparsers.add_parser("verify", help="Verify the integrity of a snapshot chain")
+    verify_parser = subparsers.add_parser(
+        "verify", help="Verify the integrity of a snapshot chain"
+    )
     verify_parser.add_argument(
         "--snapshot",
         "-s",

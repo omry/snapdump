@@ -5,36 +5,39 @@ import re
 import sys
 import subprocess
 
-datasets = [
-    'storage/home',
-    'storage/datasets01',
-]
+datasets = ["storage/home", "storage/datasets01"]
+
 
 def denied():
     print("Access denied")
     sys.exit(1)
 
 
-if 'SSH_ORIGINAL_COMMAND' not in os.environ:
+if "SSH_ORIGINAL_COMMAND" not in os.environ:
     denied()
 
-cmd = os.environ['SSH_ORIGINAL_COMMAND']
+cmd = os.environ["SSH_ORIGINAL_COMMAND"]
 
 # read only, can take arbitrary flags
-re_list = re.compile(r'^zfs list( -\w( [\w/_-]+)?)*$')
+re_list = re.compile(r"^zfs list( -\w( [\w/_-]+)?)*$")
 
 # work 	exactly on one snapshot and does not take any additional flags
-re_snap_ops = re.compile(r'^zfs (snapshot|destroy) ([\w/]+)@([\w]+)$')
-re_send = re.compile(r'^zfs send ([\w/]+)@([\w]+)( -i [\w]+)?$')
-re_recv = re.compile(r'^zfs recv -F ([\w/]+)$')
-zstreamdump = re.compile(r'^zstreamdump$')
+re_snap_ops = re.compile(r"^zfs (snapshot|destroy) ([\w/]+)@([\w]+)$")
+re_send = re.compile(r"^zfs send ([\w/]+)@([\w]+)( -i [\w]+)?$")
+re_recv = re.compile(r"^zfs recv -F ([\w/]+)$")
+zstreamdump = re.compile(r"^zstreamdump$")
+
 
 def unsupported_dataset_error(a_dataset):
-    print(f"{a_dataset} is not in the list of managed datasets, fix in {__file__} in the server")
+    print(
+        f"{a_dataset} is not in the list of managed datasets, fix in {__file__} in the server"
+    )
     sys.exit(1)
+
 
 def execute(a_cmd):
     subprocess.call(a_cmd, shell=True)
+
 
 if zstreamdump.match(cmd) or re_list.match(cmd):
     execute(cmd)

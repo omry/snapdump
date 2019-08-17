@@ -20,7 +20,7 @@ TEMPDIR_SUFFIX = "dump-in-progress"
 def log(msg):
     if not CRON:
         print(msg)
-    
+
 def get_ssh_cmd_arr(conf):
     cmd = ["ssh", f"{conf.server.ssh_user}@{conf.server.hostname}"]
     if conf.server.identity_file is not None:
@@ -367,7 +367,7 @@ def list_dataset_snapshots(conf, dataset):
         for (group_dir, snap_type, snap_name, directory) in get_stored_snapshots(dataset_dir):
             dump_dir = f"{dataset_dir}/{directory}"
             marker = "=" if snap_type == 'full' else '+'  # = full, + = incremental
-            size_bytes = sum(os.path.getsize(f"{dump_dir}/{f}") for f in os.listdir(dump_dir) if os.path.isfile(f"{dump_dir}/{f}")) 
+            size_bytes = sum(os.path.getsize(f"{dump_dir}/{f}") for f in os.listdir(dump_dir) if os.path.isfile(f"{dump_dir}/{f}"))
             total += size_bytes
             size_gb = size_bytes / (1024.0 * 1024 * 1024)
             total_gb = total / (1024.0 * 1024 * 1024)
@@ -476,7 +476,7 @@ def main():
         required=True,
     )
     args = parser.parse_args()
-    conf = OmegaConf.from_filename(args.conf)
+    conf = OmegaConf.load(args.conf)
     global CRON
     CRON = args.cron
     if args.command == "backup":

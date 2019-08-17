@@ -28,7 +28,7 @@ with open("README.md", "r") as fh:
             "License :: OSI Approved :: MIT License",
         ],
         install_requires=[
-            'omegaconf>=1.0.7',
+            'omegaconf>=1.3.0',
             'setuptools'
         ]
     )
